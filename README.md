@@ -1,11 +1,30 @@
 # Z-Image Turbo - One-Click Windows Installer (Low VRAM)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://www.microsoft.com/windows)
+[![Built with Gradio](https://img.shields.io/badge/Built%20with-Gradio-FFD21F?logo=gradio)](https://gradio.app)
+[![Low VRAM Support](https://img.shields.io/badge/VRAM-4GB+-green)](https://github.com/leejet/stable-diffusion.cpp)
+
 A beginner-friendly Windows package to run **Z-Image Turbo (GGUF)** locally with a simple **Gradio Web UI**.
 
 Target users:
 
 - Low-VRAM NVIDIA GPUs (including 4GB)
 - Anyone who wants free local image generation without complex tools
+
+## Table of Contents
+- [Features](#features)
+- [Quickstart](#quickstart)
+- [Requirements](#requirements)
+- [Running the Setup](#running-the-setup)
+- [Why the Backend Files Are Manual](#why-the-backend-files-are-manual)
+- [Where to Get the Executable (Windows)](#where-to-get-the-executable-windows)
+- [NVIDIA GPU / CUDA Notes](#nvidia-gpu--cuda-notes)
+- [LoRA Support](#lora-support)
+- [Downloads](#what-the-installer-downloads-and-what-is-manual)
+- [Manual Download Sources](#manual-download-sources)
+- [Troubleshooting](#troubleshooting)
+- [Credits](#credits--upstream)
 
 ## Features
 
