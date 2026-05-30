@@ -20,7 +20,9 @@ Target users:
 - [Why the Backend Files Are Manual](#why-the-backend-files-are-manual)
 - [Where to Get the Executable (Windows)](#where-to-get-the-executable-windows)
 - [NVIDIA GPU / CUDA Notes](#nvidia-gpu--cuda-notes)
+- [Low VRAM Workflow](#low-vram-workflow)
 - [LoRA Support](#lora-support)
+- [Experimental Img2Img](#experimental-img2img)
 - [Downloads](#what-the-installer-downloads-and-what-is-manual)
 - [Manual Download Sources](#manual-download-sources)
 - [Troubleshooting](#troubleshooting)
@@ -31,8 +33,10 @@ Target users:
 - One-click installer: `start_zimage.bat`
 - Creates an isolated Python `venv` automatically
 - Downloads required model weights (GGUF) automatically
-- Gradio Web UI with prompt, resolution, seed, CFG, timer, stop button, and LoRA controls
+- Gradio Web UI with prompt, resolution, seed tools, CFG, timer, stop button, and recent output gallery
+- Low VRAM presets for 4GB, 6-8GB, and 10GB+ NVIDIA workflows
 - LoRA support through `models\loras\`
+- Experimental img2img using stable-diffusion.cpp `--init-img` and `--strength`
 - Safety-first: does **not** auto-download executables (`.exe`)
 
 ## Quickstart
@@ -133,6 +137,16 @@ After downloading it:
 
 The important migration point for old users is this: the old tutorial used `sd.exe` because stable-diffusion.cpp used to ship that way. New stable-diffusion.cpp releases use `sd-cli.exe` plus `stable-diffusion.dll`, so updating those files is what fixes many NVIDIA GPU detection/utilization problems.
 
+## Low VRAM workflow
+
+The UI includes a **Low VRAM Mode** section:
+
+- `4GB (safest)` enables CPU offload, diffusion flash attention, VAE tiling, and direct VAE convolution. There is also an optional checkbox to keep the text encoder on CPU.
+- `6-8GB (balanced)` enables CPU offload and diffusion flash attention. You can optionally enable VAE tiling for larger resolutions.
+- `10GB+ (fastest)` keeps the command lighter and focuses on faster GPU usage.
+
+The app also saves a metadata `.txt` file next to each generated image, including the prompt, seed, command, selected LoRAs, and timing. The UI shows the last command and a recent output gallery for easier testing.
+
 ## LoRA support
 
 The setup now automatically creates this folder:
@@ -150,6 +164,25 @@ To use a LoRA:
 6. Generate as usual.
 
 The UI passes selected LoRAs to stable-diffusion.cpp using prompt tags and the configured LoRA model directory.
+
+## Experimental Img2Img
+
+The UI includes an **Experimental Img2Img** tab. This uses stable-diffusion.cpp options:
+
+- `--init-img`
+- `--strength`
+
+To try it:
+
+1. Enable img2img in the tab.
+2. Upload an input image.
+3. Set the strength:
+   - `0.3` keeps the source image strongly.
+   - `0.6` is a balanced transformation.
+   - `0.85` mostly regenerates the image.
+4. Generate as usual.
+
+The app copies and resizes the uploaded image into a local temp folder before generation so the backend can read it reliably. Img2img support depends on the installed stable-diffusion.cpp build and Z-Image Turbo GGUF behavior, so it is labeled experimental.
 
 ## What the installer downloads (and what is manual)
 

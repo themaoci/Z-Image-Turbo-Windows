@@ -27,6 +27,7 @@ ENV/
 
 # Generated images and outputs
 outputs/
+tmp_inputs/
 *.png
 *.jpg
 *.jpeg
