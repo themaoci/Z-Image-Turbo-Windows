@@ -108,6 +108,9 @@ def find_sd_executable():
 
 
 SD_EXE, SD_EXE_LABEL = find_sd_executable()
+BACKEND_KIND = os.environ.get("ZIMAGE_BACKEND_KIND", "cpu")
+RNG_FLAG = "cuda" if BACKEND_KIND == "cuda12" else "std_default"
+BACKEND_FLAG = {"cuda12": "cuda0", "vulkan": "vulkan0", "rocm": "rocm0"}.get(BACKEND_KIND, "")
 
 
 def get_lora_list():
@@ -652,8 +655,10 @@ def gen_image(
         "--seed",
         str(seed),
         "--rng",
-        "cuda",
+        RNG_FLAG,
     ]
+    if BACKEND_FLAG:
+        cmd.extend(["--backend", BACKEND_FLAG])
     if negative_prompt:
         cmd.extend(["--negative-prompt", negative_prompt])
     cmd.extend(low_vram_flags(vram_mode, clip_on_cpu, balanced_vae_tiling))
@@ -695,16 +700,21 @@ def gen_image(
     total_time = f"{time.perf_counter() - t_start:.1f}s"
 
     if current_proc.returncode != 0:
-        if current_proc.returncode in [-1, 1, 3221225786, 15]:
-            yield None, f"Generation stopped.\n\n{full_log.strip()}", total_time, cmd_str
-        else:
-            yield (
-                None,
-                f"sd.exe exited with code {current_proc.returncode}\n\n{full_log.strip()}",
-                total_time,
-                cmd_str,
-            )
-        return
+        if not os.path.exists(out_file):
+            imgs = sorted(OUTDIR.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if imgs:
+                out_file = str(imgs[0].absolute())
+        if not os.path.exists(out_file):
+            if current_proc.returncode in [-1, 1, 3221225786, 15]:
+                yield None, f"Generation stopped.\n\n{full_log.strip()}", total_time, cmd_str
+            else:
+                yield (
+                    None,
+                    f"sd.exe exited with code {current_proc.returncode}\n\n{full_log.strip()}",
+                    total_time,
+                    cmd_str,
+                )
+            return
 
     if not os.path.exists(out_file):
         imgs = sorted(OUTDIR.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)

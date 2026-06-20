@@ -184,25 +184,36 @@ function Detect-Hardware {
     }
 
     $adapters = @(Get-DisplayAdapters)
-    $adapterText = ($adapters | ForEach-Object { $_.Name }) -join "; "
+    $realAdapters = $adapters | Where-Object { $_.Name -notmatch "Parsec|Virtual|Remote|Basic Display" }
+    $adapterText = ($realAdapters | ForEach-Object { $_.Name }) -join "; "
     if ($adapterText -match "AMD|Radeon") {
+        $vramMb = 0
+        $amdAdapter = $realAdapters | Where-Object { $_.Name -match "AMD|Radeon" } | Select-Object -First 1
+        if ($amdAdapter -and $amdAdapter.AdapterRAM -gt 0) {
+            $vramMb = [math]::Round($amdAdapter.AdapterRAM / 1MB)
+        }
         return [pscustomobject]@{
             Vendor = "AMD"
             Name = $adapterText
-            VramMb = 0
+            VramMb = $vramMb
             ComputeCapability = ""
             CudaAvailable = $false
-            BackendKind = "cpu"
+            BackendKind = "vulkan"
         }
     }
     if ($adapterText -match "Intel|Arc") {
+        $vramMb = 0
+        $intelAdapter = $realAdapters | Where-Object { $_.Name -match "Intel|Arc" } | Select-Object -First 1
+        if ($intelAdapter -and $intelAdapter.AdapterRAM -gt 0) {
+            $vramMb = [math]::Round($intelAdapter.AdapterRAM / 1MB)
+        }
         return [pscustomobject]@{
             Vendor = "Intel"
             Name = $adapterText
-            VramMb = 0
+            VramMb = $vramMb
             ComputeCapability = ""
             CudaAvailable = $false
-            BackendKind = "cpu"
+            BackendKind = "vulkan"
         }
     }
     return [pscustomobject]@{
@@ -222,6 +233,15 @@ function Recommend-Profile {
             return "ultra_low_vram"
         }
         if ($Hardware.VramMb -lt 10240) {
+            return "balanced"
+        }
+        return "high_end"
+    }
+    if ($Hardware.Vendor -in @("AMD", "Intel")) {
+        if ($Hardware.VramMb -ge 10240) {
+            return "high_end"
+        }
+        if ($Hardware.VramMb -ge 6144) {
             return "balanced"
         }
         return "high_end"
@@ -320,12 +340,21 @@ function Install-BackendAutomatically {
     param([string]$BackendKind)
     Write-Host ""
     Write-Host "Installing stable-diffusion.cpp backend automatically..."
+    if (Test-Path $sdBin) {
+        Remove-Item "$sdBin\*" -Recurse -Force -ErrorAction SilentlyContinue
+    }
     $release = Get-LatestRelease
     if ($BackendKind -eq "cuda12") {
         $cudaDir = Download-And-Extract-Asset -Release $release -NamePattern "sd-*-bin-win-cuda12-x64.zip" -Label "Downloading CUDA backend"
         Copy-BackendFiles -ExtractDir $cudaDir
         $runtimeDir = Download-And-Extract-Asset -Release $release -NamePattern "cudart-sd-bin-win-cu12-x64.zip" -Label "Downloading CUDA runtime DLLs"
         Copy-BackendFiles -ExtractDir $runtimeDir
+    } elseif ($BackendKind -eq "vulkan") {
+        $vulkanDir = Download-And-Extract-Asset -Release $release -NamePattern "sd-*-bin-win-vulkan-x64.zip" -Label "Downloading Vulkan backend"
+        Copy-BackendFiles -ExtractDir $vulkanDir
+    } elseif ($BackendKind -eq "rocm") {
+        $rocmDir = Download-And-Extract-Asset -Release $release -NamePattern "sd-*-bin-win-rocm-*-x64.zip" -Label "Downloading ROCm backend"
+        Copy-BackendFiles -ExtractDir $rocmDir
     } else {
         $cpuDir = Download-And-Extract-Asset -Release $release -NamePattern "sd-*-bin-win-avx2-x64.zip" -Label "Downloading CPU backend"
         Copy-BackendFiles -ExtractDir $cpuDir
@@ -461,7 +490,10 @@ function Run-SetupWizard {
     }
 
     $backendExe = Find-BackendExe
-    if (!$backendExe -and $backendMode -eq "auto") {
+    if ($backendMode -eq "auto" -and $hardware.BackendKind -ne "cpu") {
+        Install-BackendAutomatically -BackendKind $hardware.BackendKind
+        $backendExe = Find-BackendExe
+    } elseif (!$backendExe -and $backendMode -eq "auto") {
         Install-BackendAutomatically -BackendKind $hardware.BackendKind
         $backendExe = Find-BackendExe
     }
@@ -550,6 +582,7 @@ function Launch-App {
     $model.filename | Out-File -Encoding ascii $selectedModelPath
     $env:ZIMAGE_MODEL_NAME = $model.filename
     $env:ZIMAGE_PROFILE_ID = $Config.profile_id
+    $env:ZIMAGE_BACKEND_KIND = $Config.backend_kind
 
     $venvPython = $Config.venv_python
     if (!$venvPython -or !(Test-Path $venvPython)) {
