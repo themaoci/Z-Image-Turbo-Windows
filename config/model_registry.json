@@ -28,6 +28,51 @@
       "recommended_profile": "high_end",
       "approx_size_gb": 6.0
     },
+    "juggernaut-z-image-q4": {
+      "display_name": "Juggernaut Z Q4_K_S",
+      "type": "diffusion",
+      "filename": "Juggernaut_Z_V1_by_RunDiffusion_q4_k_s-001.gguf",
+      "url": "https://huggingface.co/RunDiffusion/Juggernaut-Z-Image/resolve/main/Juggernaut_Z_V1_by_RunDiffusion_q4_k_s-001.gguf",
+      "sha256": "",
+      "recommended_profile": "ultra_low_vram",
+      "approx_size_gb": 4.83
+    },
+    "juggernaut-z-image-q5s": {
+      "display_name": "Juggernaut Z Q5_K_S",
+      "type": "diffusion",
+      "filename": "Juggernaut_Z_V1_by_RunDiffusion_q5_k_s-005.gguf",
+      "url": "https://huggingface.co/RunDiffusion/Juggernaut-Z-Image/resolve/main/Juggernaut_Z_V1_by_RunDiffusion_q5_k_s-005.gguf",
+      "sha256": "",
+      "recommended_profile": "balanced",
+      "approx_size_gb": 5.34
+    },
+    "juggernaut-z-image-q5m": {
+      "display_name": "Juggernaut Z Q5_K_M",
+      "type": "diffusion",
+      "filename": "Juggernaut_Z_V1_by_RunDiffusion_q5_k_m-003.gguf",
+      "url": "https://huggingface.co/RunDiffusion/Juggernaut-Z-Image/resolve/main/Juggernaut_Z_V1_by_RunDiffusion_q5_k_m-003.gguf",
+      "sha256": "",
+      "recommended_profile": "balanced",
+      "approx_size_gb": 5.68
+    },
+    "juggernaut-z-image-q6": {
+      "display_name": "Juggernaut Z Q6_K",
+      "type": "diffusion",
+      "filename": "Juggernaut_Z_V1_by_RunDiffusion_q6_k-004.gguf",
+      "url": "https://huggingface.co/RunDiffusion/Juggernaut-Z-Image/resolve/main/Juggernaut_Z_V1_by_RunDiffusion_q6_k-004.gguf",
+      "sha256": "",
+      "recommended_profile": "balanced",
+      "approx_size_gb": 6.05
+    },
+    "juggernaut-z-image-q8": {
+      "display_name": "Juggernaut Z Q8_0",
+      "type": "diffusion",
+      "filename": "Juggernaut_Z_V1_by_RunDiffusion_q8_0.gguf",
+      "url": "https://huggingface.co/RunDiffusion/Juggernaut-Z-Image/resolve/main/Juggernaut_Z_V1_by_RunDiffusion_q8_0.gguf",
+      "sha256": "",
+      "recommended_profile": "high_end",
+      "approx_size_gb": 7.34
+    },
     "z-image-vae": {
       "display_name": "Z-Image Turbo VAE",
       "type": "vae",
@@ -67,6 +112,17 @@
       "display_name": "CPU Only",
       "target": "No compatible GPU detected",
       "default_model": "z-image-turbo-q4"
+    }
+  },
+  "loras": {
+    "nsfw-master-v2": {
+      "display_name": "NSFW MASTER V2 (Z-Image)",
+      "filename": "NSFW_master_ZIT_000017532.safetensors",
+      "url": "https://civitai.com/api/download/models/2904324",
+      "type": "lora",
+      "recommended_strength": 0.8,
+      "approx_size_gb": 0.58,
+      "notes": "NSFW content LoRA for Z-Image Turbo. Drop into models/loras/ and select in UI. Recommended strength: 0.8"
     }
   }
 }

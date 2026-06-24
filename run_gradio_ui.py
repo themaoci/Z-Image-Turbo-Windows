@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import subprocess
@@ -15,18 +16,52 @@ from PIL import Image, ImageOps
 ROOT = Path(__file__).parent
 SD_BIN_DIR = ROOT / "sd_bin"
 MODEL_CONFIG_PATH = ROOT / "models" / "zimage" / "selected_model.txt"
+REGISTRY_PATH = ROOT / "config" / "model_registry.json"
+LORA_DIR = ROOT / "models" / "loras"
+ZIMAGE_DIR = ROOT / "models" / "zimage"
+OUTDIR = ROOT / "outputs"
+TEMP_INPUT_DIR = OUTDIR / "_tmp_inputs"
+
+DEFAULT_VAE_PATH = str(ROOT / "models" / "vae" / "ae.safetensors")
+DEFAULT_LLM_PATH = str(ROOT / "models" / "llm" / "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
+
+
+def LoadModelRegistry():
+    if REGISTRY_PATH.exists():
+        try:
+            with open(REGISTRY_PATH, "r", encoding="utf-8") as F:
+                Data = json.load(F)
+            return Data.get("models", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def GetAvailableModels():
+    Registry = LoadModelRegistry()
+    Available = []
+    for ModelId, Info in Registry.items():
+        if Info.get("type") != "diffusion":
+            continue
+        FilePath = ZIMAGE_DIR / Info["filename"]
+        if FilePath.exists():
+            Available.append((ModelId, Info.get("display_name", Info["filename"]), str(FilePath)))
+    if not Available:
+        FallbackName = os.environ.get("ZIMAGE_MODEL_NAME")
+        if not FallbackName and MODEL_CONFIG_PATH.exists():
+            FallbackName = MODEL_CONFIG_PATH.read_text(encoding="utf-8").strip()
+        if not FallbackName:
+            FallbackName = "z_image_turbo_Q4_0.gguf"
+        Available.append(("fallback", FallbackName, str(ZIMAGE_DIR / FallbackName)))
+    return Available
+
+
 MODEL_NAME = os.environ.get("ZIMAGE_MODEL_NAME")
 if not MODEL_NAME and MODEL_CONFIG_PATH.exists():
     MODEL_NAME = MODEL_CONFIG_PATH.read_text(encoding="utf-8").strip()
 if not MODEL_NAME:
     MODEL_NAME = "z_image_turbo_Q4_0.gguf"
 MODEL_PATH = str(ROOT / "models" / "zimage" / MODEL_NAME)
-LORA_DIR = ROOT / "models" / "loras"
-OUTDIR = ROOT / "outputs"
-TEMP_INPUT_DIR = OUTDIR / "_tmp_inputs"
-
-DEFAULT_VAE_PATH = str(ROOT / "models" / "vae" / "ae.safetensors")
-DEFAULT_LLM_PATH = str(ROOT / "models" / "llm" / "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
 
 OUTDIR.mkdir(exist_ok=True)
 LORA_DIR.mkdir(exist_ok=True)
@@ -53,16 +88,52 @@ RES_PRESETS = [
     ("1:1 (512x512)", 512, 512),
     ("1:1 (768x768)", 768, 768),
     ("1:1 (1024x1024)", 1024, 1024),
+    ("1:1 (1536x1536)", 1536, 1536),   # New
+    ("1:1 (2048x2048)", 2048, 2048),   # New
+
+    # 16:9 Landscape
     ("16:9 (640x384)", 640, 384),
     ("16:9 (896x512)", 896, 512),
     ("16:9 (1024x576)", 1024, 576),
+    ("16:9 (1280x720)", 1280, 720),     # New (720p)
+    ("16:9 (1536x864)", 1536, 864),     # New
+    ("16:9 (1920x1080)", 1920, 1080),   # New (1080p)
+
+    # 9:16 Portrait
     ("9:16 (384x640)", 384, 640),
     ("9:16 (512x896)", 512, 896),
     ("9:16 (576x1024)", 576, 1024),
+    ("9:16 (720x1280)", 720, 1280),     # New
+    ("9:16 (864x1536)", 864, 1536),     # New
+    ("9:16 (1080x1920)", 1080, 1920),   # New
+
+    # 4:3
     ("4:3 (640x480)", 640, 480),
     ("4:3 (768x576)", 768, 576),
+    ("4:3 (1024x768)", 1024, 768),      # New
+    ("4:3 (1280x960)", 1280, 960),      # New
+
+    # 3:4 Portrait
+    ("3:4 (480x640)", 480, 640),        # New
+    ("3:4 (576x768)", 576, 768),        # New
+    ("3:4 (768x1024)", 768, 1024),      # New
+
+    # 3:2
     ("3:2 (768x512)", 768, 512),
+    ("3:2 (1024x683)", 1024, 683),      # New (approx)
+    ("3:2 (1152x768)", 1152, 768),      # New
+
+    # 2:3 Portrait
     ("2:3 (512x768)", 512, 768),
+    ("2:3 (683x1024)", 683, 1024),      # New (approx)
+
+    # Extra popular ratios
+    ("5:4 (800x640)", 800, 640),        # New
+    ("4:5 (640x800)", 640, 800),        # New (Instagram portrait friendly)
+    ("21:9 (1152x512)", 1152, 512),     # New (Ultrawide)
+    ("9:21 (512x1152)", 512, 1152),     # New (Tall ultrawide)
+    ("16:10 (1024x640)", 1024, 640),    # New
+    ("10:16 (640x1024)", 640, 1024),    # New
 ]
 
 SIZE_OPTIONS = sorted({s for _, w, h in RES_PRESETS for s in (w, h)})
@@ -79,6 +150,11 @@ TXT2IMG_PROMPTS = {
     "Fantasy": "fantasy castle above a glowing forest, epic scale, detailed architecture, cinematic lighting",
     "Anime": "anime character portrait, expressive eyes, detailed hair, clean line art, soft color palette",
     "Cinematic": "cinematic scene of a lone explorer standing in a neon-lit rainy street, film still, dramatic composition",
+    "Erotic Portrait": "sensual portrait of a woman in soft ambient lighting, elegant pose, intimate atmosphere, cinematic, 8k",
+    "Boudoir": "boudoir photography, woman in lace lingerie, soft bedroom light, luxurious sheets, professional studio quality",
+    "Artistic Nude": "artistic nude figure study, dramatic chiaroscuro lighting, classical pose, fine art photography, 8k detail",
+    "Glamour": "glamour photography, confident woman in elegant setting, soft bokeh, professional studio lighting, high detail",
+    "Sensual Fantasy": "fantasy woman in flowing silk, candlelit chamber, mystical atmosphere, ornate details, cinematic lighting",
 }
 IMG2IMG_PROMPTS = {
     "Color edit": "Change only the main subject color while preserving the same shape, lighting, background, and composition",
@@ -92,6 +168,26 @@ INPAINT_PROMPTS = {
     "Remove object": "Fill the masked area naturally using the surrounding background",
     "Add detail": "Add realistic detail inside the masked area while matching the original image style",
 }
+NSFW_PROMPTS = {
+    "Erotic Portrait": "sensual portrait of a woman in soft ambient lighting, elegant pose, intimate atmosphere, cinematic, 8k",
+    "Boudoir": "boudoir photography, woman in lace lingerie, soft bedroom light, luxurious sheets, professional studio quality",
+    "Artistic Nude": "artistic nude figure study, dramatic chiaroscuro lighting, classical pose, fine art photography, 8k detail",
+    "Glamour": "glamour photography, confident woman in elegant setting, soft bokeh, professional studio lighting, high detail",
+    "Sensual Fantasy": "fantasy woman in flowing silk, candlelit chamber, mystical atmosphere, ornate details, cinematic lighting",
+}
+
+
+def GetModelChoices():
+    Models = GetAvailableModels()
+    Choices = []
+    DefaultChoice = None
+    for ModelId, DisplayName, FilePath in Models:
+        Choices.append((f"{DisplayName} ({ModelId})", FilePath))
+        if ModelId == "z-image-turbo-q8" or (DefaultChoice is None and "z-image" in ModelId.lower()):
+            DefaultChoice = FilePath
+    if DefaultChoice is None and Choices:
+        DefaultChoice = Choices[0][1]
+    return Choices, DefaultChoice
 
 
 def find_sd_executable():
@@ -193,6 +289,61 @@ def refresh_loras():
 
 def refresh_gallery():
     return get_recent_outputs()
+
+
+def delete_gallery_images():
+    deleted = 0
+    for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+        for f in OUTDIR.glob(pattern):
+            try:
+                f.unlink()
+                deleted += 1
+            except OSError:
+                pass
+    for pattern in ("*.png.txt", "*.jpg.txt", "*.jpeg.txt", "*.webp.txt"):
+        for f in OUTDIR.glob(pattern):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    return get_recent_outputs(), "", f"Deleted {deleted} image(s). Gallery cleared."
+
+
+def select_gallery_image(evt: gr.SelectData):
+    if evt.index is not None and evt.index >= 0:
+        RecentImages = get_recent_outputs(50)
+        if evt.index < len(RecentImages):
+            return RecentImages[evt.index], f"Selected: **{Path(RecentImages[evt.index]).name}**"
+    if evt.value and isinstance(evt.value, str):
+        Cleaned = evt.value
+        if Cleaned.startswith("/file="):
+            Cleaned = Cleaned[len("/file="):]
+        if Cleaned.startswith("file://"):
+            Cleaned = Cleaned[len("file://"):]
+        Selected = Path(Cleaned)
+        if Selected.exists() and Selected.parent == OUTDIR:
+            return str(Selected), f"Selected: **{Selected.name}**"
+    return "", "*Click an image in the gallery to select it.*"
+
+
+def confirm_delete_selected(selected_path, confirmed):
+    if not selected_path:
+        return get_recent_outputs(), "", "No image selected. Click an image in the gallery first."
+    if not confirmed:
+        return get_recent_outputs(), selected_path, "Check **Confirm delete** to proceed."
+    selected = Path(selected_path)
+    if not selected.exists():
+        return get_recent_outputs(), "", f"File not found: {selected.name}"
+    stem = selected.stem
+    suffix = selected.suffix
+    meta_file = OUTDIR / f"{stem}{suffix}.txt"
+    try:
+        selected.unlink()
+        if meta_file.exists():
+            meta_file.unlink()
+        return get_recent_outputs(), "", f"Deleted **{selected.name}**."
+    except OSError as exc:
+        return get_recent_outputs(), selected_path, f"Failed to delete: {exc}"
 
 
 def short_prompt(prompt, limit=70):
@@ -417,6 +568,7 @@ def run_generation_job(job):
             active_strength,
             active_mask,
             generation_mode,
+            job.get("model_path", MODEL_PATH),
         ):
             if out_img is not None:
                 last_img = out_img
@@ -600,6 +752,7 @@ def gen_image(
     img2img_strength,
     mask_path=None,
     generation_mode="txt2img",
+    model_path=None,
 ):
     global current_proc
 
@@ -626,10 +779,12 @@ def gen_image(
     out_file = str((OUTDIR / f"out_{uid}.png").absolute())
     final_prompt = append_lora_tags(prompt, selected_loras, lora_strength)
 
+    ActiveModel = model_path if model_path else MODEL_PATH
+
     cmd = [
         SD_EXE,
         "--diffusion-model",
-        MODEL_PATH,
+        ActiveModel,
         "--vae",
         vae_path,
         "--llm",
@@ -743,6 +898,7 @@ def gen_image(
             "init_image": init_file,
             "mask": mask_path,
             "strength": img2img_strength if uses_input_image else None,
+            "model": os.path.basename(ActiveModel),
             "command": cmd_str,
             "generation_time": total_time,
             "log": full_log.strip(),
@@ -810,7 +966,11 @@ with gr.Blocks() as demo:
                             )
 
                     with gr.Group():
-                        gr.Markdown("### LoRA Support")
+                        gr.Markdown("### LoRA Support\n\n"
+                                    "Drop `.safetensors` LoRA files in `models/loras/` then click Refresh.\n\n"
+                                    "**NSFW MASTER LoRA** for Z-Image Turbo: download from "
+                                    "[Civitai](https://civitai.com/models/667086/nsfw-master) "
+                                    "(recommended strength: 0.8)")
                         with gr.Row():
                             lora_list = gr.CheckboxGroup(choices=get_lora_list(), label="Select LoRAs")
                             refresh_btn = gr.Button("Refresh", variant="secondary", size="sm")
@@ -821,6 +981,21 @@ with gr.Blocks() as demo:
                                 value="auto",
                                 label="LoRA Apply Mode",
                             )
+
+                    with gr.Group():
+                        gr.Markdown("### Model Selection")
+                        ModelChoices, DefaultModelPath = GetModelChoices()
+                        model_selector = gr.Dropdown(
+                            choices=[Label for Label, Path in ModelChoices],
+                            value=ModelChoices[0][0] if ModelChoices else None,
+                            label="Diffusion Model",
+                            info="Select which GGUF model to use. Drop .gguf files in models/zimage/ to add more.",
+                        )
+                        current_model_path = gr.State(value=DefaultModelPath or MODEL_PATH)
+                        gr.Markdown(
+                            "Available models: **Z-Image Turbo** (fast, 8 steps) | **Juggernaut Z** (cinematic, 25-45 steps). "
+                            "For NSFW content, use the **NSFW MASTER LoRA** (drop in models/loras/) with Z-Image Turbo at strength 0.8."
+                        )
 
                 with gr.Tab("Experimental Img2Img"):
                     gr.Markdown(
@@ -962,7 +1137,14 @@ with gr.Blocks() as demo:
             img = gr.Image(label="Result", interactive=False, type="filepath")
             timer_display = gr.Markdown("Generation Time: **0s**")
             gallery = gr.Gallery(label="Recent Outputs", value=get_recent_outputs(), columns=3, height=260)
-            refresh_gallery_btn = gr.Button("Refresh Gallery", variant="secondary")
+            selected_image_path = gr.State(value="")
+            selected_image_info = gr.Markdown("*Click an image in the gallery to select it.*")
+            with gr.Row():
+                refresh_gallery_btn = gr.Button("Refresh Gallery", variant="secondary")
+                delete_selected_btn = gr.Button("Delete Selected Image", variant="secondary")
+                delete_gallery_btn = gr.Button("Delete All", variant="stop")
+            confirm_delete = gr.Checkbox(value=False, label="Confirm delete", visible=False)
+            gallery_status = gr.Markdown("")
             command_box = gr.Textbox(label="Last Command", interactive=False, lines=3)
             queue_table = gr.Dataframe(
                 headers=["#", "Mode", "Prompt", "Seed", "Status"],
@@ -988,7 +1170,30 @@ with gr.Blocks() as demo:
     inpaint_random_seed_btn.click(random_seed, outputs=[inpaint_seed])
     inpaint_reuse_seed_btn.click(reuse_last_inpaint_seed, outputs=[inpaint_seed])
     refresh_gallery_btn.click(refresh_gallery, outputs=[gallery])
+
+    gallery.select(select_gallery_image, outputs=[selected_image_path, selected_image_info])
+    delete_selected_btn.click(
+        lambda: (gr.update(visible=True, value=False), ""),
+        outputs=[confirm_delete, gallery_status],
+    )
+    confirm_delete.change(
+        confirm_delete_selected,
+        inputs=[selected_image_path, confirm_delete],
+        outputs=[gallery, selected_image_path, gallery_status],
+    )
+    delete_gallery_btn.click(delete_gallery_images, outputs=[gallery, selected_image_path, gallery_status])
     unlock.change(set_unlocked, inputs=[unlock], outputs=[vae_path, llm_path])
+
+    def update_model_path(selected_label):
+        ModelChoices, _ = GetModelChoices()
+        for Label, Path in ModelChoices:
+            if Label == selected_label:
+                return Path
+        if ModelChoices:
+            return ModelChoices[0][1]
+        return MODEL_PATH
+
+    model_selector.change(update_model_path, inputs=[model_selector], outputs=[current_model_path])
     img2img_enabled.change(set_img2img_enabled, inputs=[img2img_enabled], outputs=[init_image, img2img_strength])
     img2img_preset.change(apply_preset, inputs=[img2img_preset], outputs=[img2img_width, img2img_height])
     init_image.change(
@@ -1043,6 +1248,7 @@ with gr.Blocks() as demo:
         selective_steps,
         selective_guidance,
         selective_strength,
+        model_path,
     ):
         generation_mode = "inpaint" if use_inpaint else "img2img" if use_img2img else "txt2img"
         if generation_mode == "inpaint":
@@ -1096,6 +1302,7 @@ with gr.Blocks() as demo:
             "selective_steps": safe_int(selective_steps, 12),
             "selective_guidance": safe_float(selective_guidance, 4.0),
             "selective_strength": safe_float(selective_strength, 0.75),
+            "model_path": model_path,
         }
         with generation_lock:
             generation_jobs.append(job)
@@ -1143,6 +1350,7 @@ with gr.Blocks() as demo:
             inpaint_steps,
             inpaint_guidance,
             inpaint_strength,
+            current_model_path,
         ],
         outputs=[queue_table, status],
         queue=False,
